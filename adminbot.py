@@ -17,8 +17,11 @@ logging.basicConfig(
 )
 
 # ----------------- الإعدادات -----------------
-TOKEN = "YOUR_BOT_TOKEN_HERE" 8423755070:AAEBIor_aPhnosUcSj1L8GM3Zr6Wx7sVBfI
-ADMIN_ID = 123456789  8849146045
+import os
+
+TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
+ADMIN_ID = int(os.getenv("ADMIN_ID", "123456789"))
+
 # بيانات وهمية (Demo Data)
 users_db = {
     1001: {"name": "أحمد", "balance": 50, "blocked": False},
