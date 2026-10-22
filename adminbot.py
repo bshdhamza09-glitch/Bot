@@ -18,7 +18,7 @@ logging.basicConfig(
 
 # ----------------- الإعدادات -----------------
 TOKEN = "8423755070:AAEBIor_aPhnosUcSj1L8GM3Zr6Wx7sVBfI" 
-ADMIN_ID = 8849146045
+ADMIN_ID = 6723268749
 
 # بيانات وهمية (Demo Data)
 users_db = {
