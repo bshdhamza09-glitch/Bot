@@ -17,29 +17,36 @@ logging.basicConfig(
 )
 
 # ----------------- الإعدادات -----------------
-import os
-
-TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
-ADMIN_ID = int(os.getenv("ADMIN_ID", "123456789"))
+TOKEN = "8423755070:AAEBIor_aPhnosUcSj1L8GM3Zr6Wx7sVBfI" 
+ADMIN_ID = 8849146045
 
 # بيانات وهمية (Demo Data)
 users_db = {
     1001: {"name": "أحمد", "balance": 50, "blocked": False},
-    1002: {"name": "سارة", "balance": 120, "blocked": False},
+    1002: {"name": "سارة", "balance": 120, "blocked": True}, # عينة لمستخدم محظور
     1003: {"name": "خالد", "balance": 0, "blocked": False},
 }
 promo_codes = {}
+
+# تخزين النصوص الإضافية (الشروحات والسجل)
+bot_content = {
+    "explanations": "هذه هي شروحات البوت الافتراضية...",
+    "history_text": "هذا هو نص زر السجل الافتراضي..."
+}
 
 # حالات التفاعل (States for ConversationHandler)
 (
     WAITING_EDIT_BALANCE_ID,
     WAITING_EDIT_BALANCE_AMOUNT,
     WAITING_BAN_ID,
+    WAITING_UNBAN_ID,         # حالة فك الحظر
     WAITING_PROMO_NAME,
     WAITING_PROMO_AMOUNT,
     WAITING_OFFERS_TEXT,
-    WAITING_GEMS_TEXT
-) = range(7)
+    WAITING_GEMS_TEXT,
+    WAITING_EXPLANATIONS_TEXT, # حالة تعديل الشروحات
+    WAITING_HISTORY_TEXT       # حالة تعديل زر السجل
+) = range(10)
 
 
 # ----------------- القائمة الرئيسية للوحة التحكم -----------------
@@ -48,7 +55,12 @@ def get_admin_keyboard():
         [InlineKeyboardButton("💰 تعديل رصيد", callback_data="admin_edit_balance")],
         [InlineKeyboardButton("👥 عرض عدد المستخدمين", callback_data="admin_count_users")],
         [InlineKeyboardButton("🎁 توزيع الإحالات للمستخدمين", callback_data="admin_distribute_referrals")],
-        [InlineKeyboardButton("🚫 حظر مستخدم", callback_data="admin_ban_user")],
+        [
+            InlineKeyboardButton("🚫 حظر مستخدم", callback_data="admin_ban_user"),
+            InlineKeyboardButton("🔓 فك حظر مستخدم", callback_data="admin_unban_user")
+        ],
+        [InlineKeyboardButton("📖 تعديل شروحات البوت", callback_data="admin_edit_explanations")],
+        [InlineKeyboardButton("📜 تعديل زر السجل", callback_data="admin_edit_history")],
         [InlineKeyboardButton("🎉 تعديل قسم العروض والبونصات", callback_data="admin_edit_offers")],
         [InlineKeyboardButton("💎 تعديل استبدال الجواهر", callback_data="admin_edit_gems")],
         [InlineKeyboardButton("🎫 إنشاء كود هدية", callback_data="admin_create_code")]
@@ -169,7 +181,65 @@ async def confirm_ban_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return ConversationHandler.END
 
 
-# ----------------- 3. مسار إنشاء كود هدية -----------------
+# ----------------- 3. مسار فك حظر مستخدم (الجديد) -----------------
+async def start_unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.message.reply_text("🔓 أدخل ID المستخدم الذي تريد فك الحظر عنه:")
+    return WAITING_UNBAN_ID
+
+async def save_unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+    if not text.isdigit():
+        await update.message.reply_text("⚠️ يرجى إدخال ID صحيح (أرقام فقط):")
+        return WAITING_UNBAN_ID
+
+    target_id = int(text)
+    if target_id in users_db:
+        users_db[target_id]["blocked"] = False
+        await update.message.reply_text(f"✅ **تم فك الحظر عن المستخدم صاحب الـ ID (`{target_id}`) بنجاح.**", parse_mode="Markdown")
+    else:
+        # حتى لو لم يكن موجوداً بالقائمة الوهمية، يمكنك التعامل معه برمجياً
+        await update.message.reply_text(f"✅ **تم إرسال أمر فك الحظر للـ ID (`{target_id}`).**", parse_mode="Markdown")
+    
+    return ConversationHandler.END
+
+
+# ----------------- 4. مسار تعديل شروحات البوت (الجديد) -----------------
+async def start_edit_explanations(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.message.reply_text(
+        f"📖 **الشروحات الحالية:**\n`{bot_content['explanations']}`\n\n📝 أدخل نص الشروحات الجديد:",
+        parse_mode="Markdown"
+    )
+    return WAITING_EXPLANATIONS_TEXT
+
+async def save_explanations_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    new_text = update.message.text
+    bot_content["explanations"] = new_text
+    await update.message.reply_text("✅ **تم تحديث شروحات البوت بنجاح!**", parse_mode="Markdown")
+    return ConversationHandler.END
+
+
+# ----------------- 5. مسار تعديل زر السجل (الجديد) -----------------
+async def start_edit_history(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.message.reply_text(
+        f"📜 **محتوى السجل الحالي:**\n`{bot_content['history_text']}`\n\n📝 أدخل نص أو تصميم زر السجل الجديد:",
+        parse_mode="Markdown"
+    )
+    return WAITING_HISTORY_TEXT
+
+async def save_history_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    new_text = update.message.text
+    bot_content["history_text"] = new_text
+    await update.message.reply_text("✅ **تم تحديث محتوى/زر السجل بنجاح!**", parse_mode="Markdown")
+    return ConversationHandler.END
+
+
+# ----------------- 6. مسار إنشاء كود هدية -----------------
 async def start_create_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -193,7 +263,6 @@ async def save_promo_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
     code_name = context.user_data['promo_name']
     promo_codes[code_name] = amount
 
-    # إظهار الكود بنمط Monospace ليُنسخ بضغطة واحدة
     msg = (
         "✅ **تم إنشاء كود الهدية بنجاح!**\n\n"
         f"🏷 **اسم الكود (اضغط للنسخ):**\n`{code_name}`\n\n"
@@ -203,7 +272,7 @@ async def save_promo_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
-# ----------------- 4. مسار تعديل العروض والبونصات -----------------
+# ----------------- 7. مسار تعديل العروض والبونصات -----------------
 async def start_edit_offers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -216,7 +285,7 @@ async def save_offers_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
-# ----------------- 5. مسار تعديل استبدال الجواهر -----------------
+# ----------------- 8. مسار تعديل استبدال الجواهر -----------------
 async def start_edit_gems(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -257,6 +326,33 @@ def main():
         fallbacks=[CommandHandler("cancel", cancel)],
     )
 
+    # معالج فك الحظر (الجديد)
+    unban_handler = ConversationHandler(
+        entry_points=[CallbackQueryHandler(start_unban_user, pattern="^admin_unban_user$")],
+        states={
+            WAITING_UNBAN_ID: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_unban_user)],
+        },
+        fallbacks=[CommandHandler("cancel", cancel)],
+    )
+
+    # معالج تعديل الشروحات (الجديد)
+    explanations_handler = ConversationHandler(
+        entry_points=[CallbackQueryHandler(start_edit_explanations, pattern="^admin_edit_explanations$")],
+        states={
+            WAITING_EXPLANATIONS_TEXT: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_explanations_text)],
+        },
+        fallbacks=[CommandHandler("cancel", cancel)],
+    )
+
+    # معالج تعديل زر السجل (الجديد)
+    history_handler = ConversationHandler(
+        entry_points=[CallbackQueryHandler(start_edit_history, pattern="^admin_edit_history$")],
+        states={
+            WAITING_HISTORY_TEXT: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_history_text)],
+        },
+        fallbacks=[CommandHandler("cancel", cancel)],
+    )
+
     promo_handler = ConversationHandler(
         entry_points=[CallbackQueryHandler(start_create_code, pattern="^admin_create_code$")],
         states={
@@ -282,10 +378,13 @@ def main():
         fallbacks=[CommandHandler("cancel", cancel)],
     )
 
-    # إضافة الأوامر
+    # إضافة الأوامر والمحاور للبوت
     app.add_handler(CommandHandler("admin", admin_start))
     app.add_handler(balance_handler)
     app.add_handler(ban_handler)
+    app.add_handler(unban_handler)
+    app.add_handler(explanations_handler)
+    app.add_handler(history_handler)
     app.add_handler(promo_handler)
     app.add_handler(offers_handler)
     app.add_handler(gems_handler)
